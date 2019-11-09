@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,15 @@ func (p *probeArgs) Set(val string) error {
 
 func (p probeArgs) String() string {
 	return strings.Join(p, ",")
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
 
 func main() {
@@ -48,7 +58,11 @@ func main() {
 	var verbose bool
 	flag.BoolVar(&verbose, "v", false, "output errors to stderr")
 
+	var excludeStatusCode string
+	flag.StringVar(&excludeStatusCode, "exclude-status-code", "", "Exclude status codes from the results, ex: 200,400,301")
 	flag.Parse()
+
+	listStatusCode := strings.Split(excludeStatusCode, ",")
 
 	// make an actual time.Duration out of the timeout
 	timeout := time.Duration(to * 1000000)
@@ -86,7 +100,9 @@ func main() {
 
 		go func() {
 			for url := range urls {
-				if isListening(client, url) {
+
+				listening, statuscode := isListening(client, url)
+				if listening == true && stringInSlice(strconv.Itoa(statuscode), listStatusCode) == true {
 					fmt.Println(url)
 					continue
 				}
@@ -106,9 +122,9 @@ func main() {
 		domain := strings.ToLower(sc.Text())
 
 		// submit http and https versions to be checked
+		// @TODO support URI's and domains
 		if !skipDefault {
-			urls <- "http://" + domain
-			urls <- "https://" + domain
+			urls <- domain
 		}
 
 		// Adding port templates
@@ -152,11 +168,11 @@ func main() {
 	wg.Wait()
 }
 
-func isListening(client *http.Client, url string) bool {
-
+func isListening(client *http.Client, url string) (bool, int) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return false
+
+		return false, 0
 	}
 
 	req.Header.Add("Connection", "close")
@@ -169,8 +185,9 @@ func isListening(client *http.Client, url string) bool {
 	}
 
 	if err != nil {
-		return false
+
+		return false, 0
 	}
 
-	return true
+	return true, resp.StatusCode
 }
