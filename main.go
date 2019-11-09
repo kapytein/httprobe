@@ -102,7 +102,7 @@ func main() {
 			for url := range urls {
 
 				listening, statuscode := isListening(client, url)
-				if listening == true && stringInSlice(strconv.Itoa(statuscode), listStatusCode) == true {
+				if listening == true && stringInSlice(strconv.Itoa(statuscode), listStatusCode) == false {
 					fmt.Println(url)
 					continue
 				}
